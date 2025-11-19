@@ -5,8 +5,8 @@
 #include <LiquidCrystal_I2C.h>
 
 // ===== WiFi + ThingsBoard =====
-const char* ssid = "PTCL-BB";  //  enter WIFI SSID
-const char* password = "76BD68EE";  //  enter WIFI Password
+const char* ssid = "";  //  enter WIFI SSID
+const char* password = "";  //  enter WIFI Password
 
 const char* mqtt_server = "192.168.1.28";  // your ThingsBoard IP
 const int mqtt_port = 1883;
