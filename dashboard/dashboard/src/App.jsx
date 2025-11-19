@@ -7,7 +7,7 @@ import ProbabilityBar from "./components/ProbabilityBar";
 import DistanceChart from "./components/DistanceChart";
 
 function App() {
-  const [distance, setDistance] = useState(50);
+  const [distance, setDistance] = useState(30);
   const [floodCase, setFloodCase] = useState("Normal");
   const [override, setOverride] = useState(false);
   const [probability, setProbability] = useState(10);
@@ -15,19 +15,24 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const newDistance = Math.floor(Math.random() * 100);
-      setDistance(newDistance);
+    client.on("connect", () => {
+      console.log("MQTT connected!");
+      client.subscribe("esp32/esp32-01/telemetry");
+      client.subscribe("laptop/ai/esp32-01/result");
+    });
 
-      if (newDistance < 23) setFloodCase("Critical");
-      else if (newDistance < 40) setFloodCase("Warning");
-      else setFloodCase("Normal");
+    client.on("message", (topic, message) => {
+      const payload = JSON.parse(message.toString());
+      if (topic === "esp32/esp32-01/telemetry") {
+        setDistance(payload.distance);
+        setFloodCase(payload.status);
+        setHistory((prev) => [...prev.slice(1), payload.distance]);
+      } else if (topic === "laptop/ai/esp32-01/result") {
+        setProbability(payload.flood_probability);
+      }
+    });
 
-      setProbability(Math.floor(Math.random() * 100));
-      setHistory((prev) => [...prev.slice(1), newDistance]);
-    }, 2000);
-
-    return () => clearInterval(interval);
+    return () => client.end();
   }, []);
 
   return (
