@@ -13,7 +13,7 @@ export default function DashboardCards({ distance, floodCase }) {
       {/* Flood Case Card */}
       <div
         className={`${cardBase} border-t-4 ${
-          floodCase === "Critical"
+          floodCase === "Severe"
             ? "border-red-500"
             : floodCase === "Warning"
             ? "border-yellow-500"

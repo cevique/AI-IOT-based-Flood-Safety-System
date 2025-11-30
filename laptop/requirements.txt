@@ -2,3 +2,6 @@ paho-mqtt
 numpy
 scikit-learn
 joblib
+flask
+flask-cors
+python-dotenv

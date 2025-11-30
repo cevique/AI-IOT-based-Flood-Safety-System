@@ -4,11 +4,11 @@
 #include <PubSubClient.h>
 #include <LiquidCrystal_I2C.h>
 
-// ===== WiFi + ThingsBoard =====
-const char* ssid = "";  //  enter WIFI SSID
-const char* password = "";  //  enter WIFI Password
+// ===== WiFi + Mosquitto =====
+const char* ssid = "PTCL-BB";       //  enter WIFI SSID
+const char* password = "76BD68EE";  //  enter WIFI Password
 
-const char* mqtt_server = "192.168.1.28";  // your ThingsBoard IP
+const char* mqtt_server = "192.168.10.7";  // your Mosquitto server IP
 const int mqtt_port = 1883;
 
 WiFiClient espClient;
@@ -20,31 +20,60 @@ int floodIncomingCount = 0;
 int normalCount = 0;
 
 // Flood monitor - debounce + hysteresis
-const int trigPin = 23;    // AJ-SR04M trigger ultrasonic wave 40kHz
-const int echoPin = 35;    //  AJ-SR04M receive reflected ultrasonnic wave
 const int ledPin = 19;     //  Control LED ON/OFF state
 const int buzzerPin = 18;  //  Control Buzzer ON/OFF state
 // const int RX = 10; //  Arduino receive signal transmitted by GSM
 // const int TX = 11;  //  Arduino transmits signal received by GSM
 const int buttonPin = 5;  // push button input
-const int buttonPin2 = 4;
+const int buttonPin2 = 4; // Unused in new logic but kept for pin def
 long duration;                    // time (µs) between send and receive
 float distanceCm;                 // measured distance from sensor to water
 float prevdistanceCm = 31.0;      //  can be anything outside threshold to run code for 1st time
-const float thresholdCm = 24.0;   // critical level (enter alarm) in cm also sms
-const float hysteresisCm = 1.0;   // stay-in-alarm margin
-const float thresholdCm2 = 21.0;  // critical level for call
+
+// Thresholds
+const float safeThreshold = 24.0;   // > 24 is Safe
+const float severeThreshold = 21.0; // <= 21 is Severe
 
 // debounce / stability settings
 const int alarmLimit = 3;  // number of consecutive readings required to enter alarm
 int alarmCount = 0;
-bool alarmState = false;      // true when alarm is active
-bool answered = false;        // true when call is answered
 bool manualOverride = false;  // false = normal mode, true = override active
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
+void callback(char* topic, byte* payload, unsigned int length) {
+  String message = "";
+  for (int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
+  Serial.println(message);
+
+  if (String(topic) == "laptop/commands/esp32-01") {
+    if (message.indexOf("manual_override") >= 0) {
+      // Toggle override on command
+      manualOverride = !manualOverride;
+      if (manualOverride) {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Remote Override");
+        delay(800);
+        lcd.clear();
+      } else {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Remote Resume");
+        delay(800);
+        lcd.clear();
+      }
+    }
+  }
+}
+
 void setup() {
+  Serial.begin(115200);
   // --- WiFi Connect ---
   WiFi.begin(ssid, password);
   Serial.print("Connecting to WiFi");
@@ -56,10 +85,13 @@ void setup() {
 
   // --- MQTT setup ---
   client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(callback);
+  
   while (!client.connected()) {
-    Serial.print("Connecting to ThingsBoard...");
+    Serial.print("Connecting to Mosquitto...");
     if (client.connect("ESP32Client")) {
       Serial.println("connected!");
+      client.subscribe("laptop/commands/esp32-01");
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -67,73 +99,52 @@ void setup() {
       delay(3000);
     }
   }
+  
   lcd.init();  // initialize LCD
   Wire.begin();
   Wire.setClock(400000);
-  lcd.backlight();  // turn on backlight
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
+  lcd.backlight();
   pinMode(ledPin, OUTPUT);
   pinMode(buzzerPin, OUTPUT);
   pinMode(buttonPin, INPUT_PULLUP);  // active LOW
   pinMode(buttonPin2, INPUT_PULLUP);
-  Serial.begin(115200);
 }
 
-void override() {
-  // Button 1 pressed: activate manual override
-  if (distanceCm <= thresholdCm) {
+void checkOverrideButton() {
+  // Simple toggle logic on button press
+  if (digitalRead(buttonPin) == LOW) {
+    delay(50); // debounce
     if (digitalRead(buttonPin) == LOW) {
-      manualOverride = true;
-      alarmState = false;
-      alarmCount = 0;
-
-      digitalWrite(ledPin, LOW);
-      noTone(buzzerPin);
-
+      manualOverride = !manualOverride;
+      
       lcd.clear();
       lcd.setCursor(0, 0);
-      lcd.print("Manual Override");
-      delay(800);
+      if (manualOverride) {
+        lcd.print("Manual Override");
+      } else {
+        lcd.print("Auto Resumed");
+      }
+      delay(1000); // Prevent multiple toggles
       lcd.clear();
     }
-  }
-  // Button 2 pressed: cancel manual override
-  if (digitalRead(buttonPin2) == LOW && manualOverride == true) {
-    manualOverride = false;
-
-    // reset counters and state so system restarts fresh
-    alarmState = false;
-    alarmCount = 0;
-
-    digitalWrite(ledPin, HIGH);
-    tone(buzzerPin, 1000);
-
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Override Cancel");
-    lcd.setCursor(0, 1);
-    lcd.print("Auto Resumed");
-    delay(1000);
-    lcd.clear();
   }
 }
 
 double readSensor() {
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(2);
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
+  // Generate a random number between 0 and 100 using ESP32's hardware random function
+  int randVal = esp_random() % 100;  // esp_random() returns a 32-bit random number
 
-  duration = pulseIn(echoPin, HIGH);
-  if (duration == 0) {
-    distanceCm = prevdistanceCm;  // no echo
+  // If randVal is less than 70, generate a value between 25 and 50 (favoring higher values)
+  // Otherwise, generate a value between 20 and 24
+  if (randVal < 70) {
+    distanceCm = random(25, 51);  // Random value between 25 and 50
   } else {
-    distanceCm = duration / 58.00;
+    distanceCm = random(20, 25);  // Random value between 20 and 24
   }
+
   return distanceCm;
 }
+
 
 void sendToThingsBoard(float distance, String status) {
   // Build JSON string manually
@@ -152,11 +163,12 @@ void sendToThingsBoard(float distance, String status) {
 
   // publish
   if (client.connected()) {
-    client.publish("v1/devices/me/telemetry", payload.c_str());
+    client.publish("esp32/esp32-01/telemetry", payload.c_str());
   } else {
     Serial.println("MQTT disconnected, reconnecting...");
     if (client.connect("ESP32Client")) {
-      client.publish("v1/devices/me/telemetry", payload.c_str());
+      client.subscribe("laptop/commands/esp32-01");
+      client.publish("esp32/esp32-01/telemetry", payload.c_str());
     }
   }
 }
@@ -164,120 +176,61 @@ void sendToThingsBoard(float distance, String status) {
 
 void loop() {
   distanceCm = readSensor();
-  if (distanceCm > thresholdCm) {
-    Serial.print("Distance (cm): ");
-    Serial.println(distanceCm);
-
-    lcd.setCursor(0, 0);
-    lcd.print("Distance: ");
-    lcd.print(distanceCm);
-    lcd.print("   ");
-    lcd.setCursor(0, 1);
-    lcd.print("                ");
-  }
-
-  // hysteresis thresholds
-  float enterThreshold = thresholdCm;                 // go into alarm when <= this
-  float leaveThreshold = thresholdCm + hysteresisCm;  // exit alarm when > this
-  override();
-
-  // Auto cancel manual override when leaving threshold
-  if (manualOverride && distanceCm > thresholdCm) {
-    manualOverride = false;
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Override AutoOff");
-    lcd.setCursor(0, 1);
-    lcd.print("Normal Mode     ");
-    delay(800);
-    lcd.clear();
-  }
-
-
-  if (manualOverride) {
-    digitalWrite(ledPin, LOW);
-    noTone(buzzerPin);
-
-    lcd.setCursor(0, 0);
-    lcd.print("Override Active ");
-    lcd.setCursor(0, 1);
-    lcd.print("System Paused   ");
-
-    delay(300);
-    return;  // skip the rest of the loop
-  }
-
-  // debounce + hysteresis logic
-  if (!alarmState) {
-    // not currently alarming: require consecutive readings <= enterThreshold
-    if (distanceCm <= enterThreshold) {
-      alarmCount++;
-      if (alarmCount >= alarmLimit) {
-        alarmState = true;
-        alarmCount = 0;
-      }
-    } else {
-      alarmCount = 0;
-    }
-  } else {
-    // currently alarming: stay in alarm until distance > leaveThreshold
-    if (distanceCm > leaveThreshold) {
-      alarmCount++;
-      if (alarmCount >= alarmLimit) {
-        alarmState = false;
-        alarmCount = 0;
-      }
-    } else {
-      alarmCount = 0;
-    }
-  }
-
-  String status = "Normal";
-
-  // outputs based on alarmState
-  if (alarmState) {
-    digitalWrite(ledPin, HIGH);
-    tone(buzzerPin, 1000);
-    while (distanceCm <= thresholdCm && distanceCm >= thresholdCm2) {
-      override();
-      lcd.setCursor(0, 0);
-      lcd.print("Distance: ");
-      lcd.print(distanceCm);
-      lcd.print("   ");  // clear leftover chars
-      lcd.setCursor(0, 1);
-      lcd.print("Possible Flood   ");
-      status = "Flood Possible";
-      floodPossibleCount++;
-      distanceCm = readSensor();
-      sendToThingsBoard(distanceCm, status);
-      delay(150);
-    }
-
-    while (distanceCm < thresholdCm2) {
-      override();
-      lcd.setCursor(0, 0);
-      lcd.print("Distance: ");
-      lcd.print(distanceCm);
-      lcd.print("   ");
-      lcd.setCursor(0, 1);
-      lcd.print("Flood Incoming!  ");
-      status = "Flood Incoming";
-      floodIncomingCount++;
-      distanceCm = readSensor();
-      sendToThingsBoard(distanceCm, status);
-      delay(150);
-    }
-
-  } else {
-    digitalWrite(ledPin, LOW);
+  checkOverrideButton();
+  
+  String status = "Safe";
+  
+  // Logic Flow
+  // 1. Determine Status based on distance
+  if (distanceCm > safeThreshold) {
+    status = "Safe";
     normalCount++;
-    sendToThingsBoard(distanceCm, status);
-    noTone(buzzerPin);
+  } else if (distanceCm > severeThreshold) {
+    status = "Warning";
+    floodPossibleCount++;
+  } else {
+    status = "Severe";
+    floodIncomingCount++;
   }
 
-  sendToThingsBoard(distanceCm, status);
-  client.loop();  // keep MQTT alive
+  // 2. Actuators (LED/Buzzer)
+  if (status == "Severe") {
+    if (manualOverride) {
+      // Override active: Silence everything
+      digitalWrite(ledPin, LOW);
+      noTone(buzzerPin);
+    } else {
+      // Severe and no override: Alarm ON
+      digitalWrite(ledPin, HIGH);
+      tone(buzzerPin, 1000);
+    }
+  } else {
+    // Safe or Warning: Everything OFF
+    digitalWrite(ledPin, LOW);
+    noTone(buzzerPin);
+    
+    // Auto-reset override if we return to safe/warning? 
+    // User didn't explicitly ask for auto-reset, but it's good practice.
+    // Keeping it manual toggle for now as per "When it's pressed again...".
+  }
 
+  // 3. LCD Display
+  lcd.setCursor(0, 0);
+  lcd.print("Dist: ");
+  lcd.print(distanceCm);
+  lcd.print("cm   ");
+  
+  lcd.setCursor(0, 1);
+  if (manualOverride) {
+    lcd.print("Override Active ");
+  } else {
+    lcd.print(status);
+    lcd.print("          "); // clear rest of line
+  }
+
+  // 4. Telemetry
+  sendToThingsBoard(distanceCm, status);
+  client.loop();
 
   delay(500);
   prevdistanceCm = distanceCm;

@@ -2,7 +2,7 @@ import json
 import time
 import paho.mqtt.client as mqtt
 
-BROKER = "192.168.10.9"   # your Mosquitto broker IP
+BROKER = "192.168.10.8"   # your Mosquitto broker IP
 PORT = 1883
 DEVICE_ID = "esp32-01"
 

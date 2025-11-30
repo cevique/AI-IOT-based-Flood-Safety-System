@@ -14,7 +14,14 @@ export default function Sidebar({
   setSidebarOpen,
 }) {
   const [logoBounce, setLogoBounce] = useState(false);
-  const handleOverrideClick = () => setOverride((prev) => !prev);
+  const handleOverrideClick = async () => {
+    try {
+      await fetch(`${import.meta.env.VITE_API_URL}/api/override`, { method: "POST" });
+      setOverride((prev) => !prev);
+    } catch (error) {
+      console.error("Error sending override command:", error);
+    }
+  };
   const [activePage, setActivePage] = useState("Home");
 
   const navItems = [
