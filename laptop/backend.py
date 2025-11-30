@@ -10,6 +10,7 @@ from flask_cors import CORS
 from sklearn.linear_model import LinearRegression
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
+from notification_service import NotificationService
 
 load_dotenv()
 
@@ -18,6 +19,15 @@ BROKER = os.getenv("MQTT_BROKER", "localhost")
 PORT = 1883
 DEVICE_ID = "esp32-01"
 DB_FILE = "flood_data.db"
+
+# Alert Configuration
+ALERT_THRESHOLD = 30  # seconds to wait before sending alert
+ALERT_COOLDOWN = 300  # seconds between alerts
+alert_start_time = None
+last_alert_sent_time = 0
+alert_active = False  # For frontend popup
+
+notification_service = NotificationService()
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -66,6 +76,25 @@ def on_message(client, userdata, msg):
                    payload.get("floodIncomingCount", 0)))
         conn.commit()
         conn.close()
+
+        # Alert Logic
+        global alert_start_time, last_alert_sent_time, alert_active
+        status = payload.get("status", "Safe")
+        
+        if status in ["Warning", "Severe"]:
+            if alert_start_time is None:
+                alert_start_time = time.time()
+            
+            duration = time.time() - alert_start_time
+            if duration > ALERT_THRESHOLD:
+                alert_active = True
+                if time.time() - last_alert_sent_time > ALERT_COOLDOWN:
+                    message = f"URGENT: Flood Status is {status}! Duration: {int(duration)}s. Immediate action required."
+                    threading.Thread(target=notification_service.send_all, args=("FLOOD ALERT", message)).start()
+                    last_alert_sent_time = time.time()
+        else:
+            alert_start_time = None
+            alert_active = False
         
     except Exception as e:
         print(f"Error processing message: {e}")
@@ -114,7 +143,8 @@ def get_status():
             # also include the original ESP32-style keys for compatibility
             "normalCount": normal,
             "floodPossibleCount": flood_possible,
-            "floodIncomingCount": flood_incoming
+            "floodIncomingCount": flood_incoming,
+            "alert_active": alert_active
         })
     else:
         return jsonify({"status": "No Data", "distance": 0})

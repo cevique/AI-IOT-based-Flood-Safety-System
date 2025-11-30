@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./App.css";
 import Sidebar from "./components/Sidebar";
 import DashboardCards from "./components/DashboardCards";
@@ -6,6 +6,8 @@ import StatusCounts from "./components/StatusCounts";
 import DistanceChart from "./components/DistanceChart";
 import Logs from "./components/Logs";
 import AIAnalytics from "./components/AIAnalytics";
+import Contact from "./components/Contact";
+import { toast } from "react-toastify";
 
 function App() {
   const [distance, setDistance] = useState(30);
@@ -15,6 +17,8 @@ function App() {
   const [history, setHistory] = useState(Array(10).fill(50));
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activePage, setActivePage] = useState("Home");
+  const [alertActive, setAlertActive] = useState(false);
+  const toastId = useRef(null);
 
   useEffect(() => {
   let isMounted = true; // to avoid state updates after unmount
@@ -36,6 +40,28 @@ function App() {
             warning: statusData.counts.warning || 0,
             severe: statusData.counts.severe || 0,
           });
+        }
+        
+        // Alert Logic
+        if (statusData.alert_active) {
+          if (!toast.isActive(toastId.current)) {
+            toastId.current = toast.error("DANGER: Flood Warning Persisting! Evacuation may be required.", {
+              position: "top-center",
+              autoClose: false,
+              hideProgressBar: false,
+              closeOnClick: false,
+              pauseOnHover: true,
+              draggable: true,
+              progress: undefined,
+              theme: "colored",
+              style: { fontSize: "1.2em", fontWeight: "bold" }
+            });
+          }
+        } else {
+          if (toastId.current) {
+            toast.dismiss(toastId.current);
+            toastId.current = null;
+          }
         }
       }
 
@@ -105,6 +131,7 @@ fetch(import.meta.env.VITE_API_URL + "/api/logs")
         )}
         {activePage === "Charts" && <AIAnalytics />}
         {activePage === "Alerts" && <Logs />}
+        {activePage === "Contact" && <Contact />}
       </div>
     </div>
   );

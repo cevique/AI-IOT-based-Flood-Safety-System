@@ -4,7 +4,7 @@ import {
   AiFillHome,
   AiOutlineLineChart,
   AiFillBell,
-  AiFillSetting,
+  AiFillPhone,
 } from "react-icons/ai";
 
 export default function Sidebar({
@@ -22,7 +22,7 @@ export default function Sidebar({
     { name: "Home", icon: <AiFillHome /> },
     { name: "Charts", icon: <AiOutlineLineChart /> },
     { name: "Alerts", icon: <AiFillBell /> },
-    { name: "Settings", icon: <AiFillSetting /> },
+    { name: "Contact", icon: <AiFillPhone /> },
   ];
 
   const handleNavClick = (name) => {
@@ -79,7 +79,7 @@ export default function Sidebar({
             if (window.innerWidth < 768) setSidebarOpen(false);
           }}
         >
-          {override ? "Override ON" : "Override OFF"}
+          {override ? "Water-sense ON" : "Water-sense ON"}
         </div>
 
         {/* Navigation */}
