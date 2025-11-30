@@ -2,11 +2,13 @@ import { useState, useEffect } from "react";
 import "./App.css";
 import Sidebar from "./components/Sidebar";
 import DashboardCards from "./components/DashboardCards";
+import StatusCounts from "./components/StatusCounts";
 import DistanceChart from "./components/DistanceChart";
 
 function App() {
   const [distance, setDistance] = useState(30);
   const [floodCase, setFloodCase] = useState("Safe");
+  const [counts, setCounts] = useState({ normal: 0, warning: 0, severe: 0 });
   const [override, setOverride] = useState(false);
   const [history, setHistory] = useState(Array(10).fill(50));
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -25,9 +27,13 @@ function App() {
       if (isMounted && statusData) {
         if (typeof statusData.distance !== "undefined") setDistance(statusData.distance);
         if (typeof statusData.status !== "undefined") setFloodCase(statusData.status);
-
-        // if you want counts too:
-        // setNormalCount(statusData.normalCount ?? statusData.counts?.normal ?? 0)
+        if (statusData.counts) {
+          setCounts({
+            normal: statusData.counts.normal || 0,
+            warning: statusData.counts.warning || 0,
+            severe: statusData.counts.severe || 0,
+          });
+        }
       }
 
       // Fetch History
@@ -85,6 +91,7 @@ function App() {
       {/* Main Content */}
       <div className="flex-1 p-4 max-w-full md:max-w-4xl mx-auto">
         <DashboardCards distance={distance} floodCase={floodCase} />
+        <StatusCounts counts={counts} />
         <DistanceChart history={history} />
       </div>
     </div>
