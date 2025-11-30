@@ -1,0 +1,8 @@
+read = median(filter(last_N_samples + new_sample))
+smoothed = alpha*read + (1-alpha)*prev_smoothed
+trend = smoothed - smoothed_lookback
+if smoothed > flood_threshold OR trend > trend_threshold:
+    if consecutive_alert_count >= K:
+        send_alert()
+else:
+    reset consecutive_alert_count

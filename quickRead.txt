@@ -1,0 +1,10 @@
+What to show in 3 minutes (elevator/demo)
+
+1. One-sentence problem → one-sentence solution.
+“Problem: fast-rising floodwater threatens communities with little early warning. Solution: a low-cost sensor + model + comms system that reliably detects rising water and sends alerts to people and authorities in real time.”
+
+2. Live demo / recorded short clip (10–30s): show sensor reading rising water and an alert (SMS / LED / dashboard).
+
+3. Quick metrics: detection time, false-positive rate during tests, cost per node, power autonomy.
+
+4. Deployment plan + social impact statement.
