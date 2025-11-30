@@ -6,7 +6,7 @@ export default function StatusCounts({ counts }) {
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
       {/* Normal Count */}
       <div className={`${cardBase} border-t-4 border-green-500`}>
-        <h2 className="font-bold text-lg text-gray-700">Normal Count</h2>
+        <h2 className="font-bold text-lg text-gray-700">Safe Count</h2>
         <p className="text-2xl font-bold text-green-600">{counts.normal}</p>
       </div>
 

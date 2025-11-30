@@ -5,6 +5,8 @@ import threading
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import paho.mqtt.client as mqtt
+import numpy as np
+from sklearn.linear_model import LinearRegression
 
 import os
 from dotenv import load_dotenv
@@ -145,6 +147,93 @@ def toggle_override():
     topic = f"laptop/commands/{DEVICE_ID}"
     mqtt_client.publish(topic, json.dumps(payload))
     return jsonify({"success": True, "message": "Override command sent"})
+
+@app.route('/api/logs', methods=['GET'])
+def get_logs():
+    filter_date = request.args.get('filter', 'all')
+    status = request.args.get('status', 'all')
+    
+    conn = sqlite3.connect(DB_FILE, timeout=10)
+    c = conn.cursor()
+    
+    query = "SELECT timestamp, distance, status FROM readings WHERE 1=1"
+    params = []
+    
+    # Date Filter
+    now = int(time.time())
+    if filter_date == 'today':
+        start_of_day = now - (now % 86400)
+        query += " AND timestamp >= ?"
+        params.append(start_of_day)
+    elif filter_date == 'yesterday':
+        start_of_day = now - (now % 86400)
+        start_of_yesterday = start_of_day - 86400
+        query += " AND timestamp >= ? AND timestamp < ?"
+        params.extend([start_of_yesterday, start_of_day])
+    elif filter_date == 'week':
+        start_of_week = now - (7 * 86400)
+        query += " AND timestamp >= ?"
+        params.append(start_of_week)
+    elif filter_date == 'month':
+        start_of_month = now - (30 * 86400)
+        query += " AND timestamp >= ?"
+        params.append(start_of_month)
+        
+    # Status Filter
+    if status != 'all':
+        query += " AND status = ?"
+        params.append(status)
+        
+    query += " ORDER BY id DESC LIMIT 100"
+    
+    c.execute(query, params)
+    rows = c.fetchall()
+    conn.close()
+    
+    logs = [{"timestamp": r[0], "distance": r[1], "status": r[2]} for r in rows]
+    return jsonify(logs)
+
+@app.route('/api/analytics', methods=['GET'])
+def get_analytics():
+    conn = sqlite3.connect(DB_FILE, timeout=10)
+    c = conn.cursor()
+    # Get last 100 readings for median
+    c.execute("SELECT distance FROM readings ORDER BY id DESC LIMIT 100")
+    rows = c.fetchall()
+    conn.close()
+    
+    if not rows:
+        return jsonify({"median": 0, "trend": "Insufficient Data", "slope": 0})
+        
+    distances = [r[0] for r in rows][::-1] # Oldest to newest
+    
+    # 1. Median
+    median_dist = float(np.median(distances))
+    
+    # 2. Trend (Linear Regression on last 20 points)
+    recent_data = distances[-20:]
+    if len(recent_data) > 1:
+        X = np.array(range(len(recent_data))).reshape(-1, 1)
+        y = np.array(recent_data)
+        model = LinearRegression()
+        model.fit(X, y)
+        slope = float(model.coef_[0])
+        
+        if slope < -0.1:
+            trend = "Water Rising (Distance Decreasing)"
+        elif slope > 0.1:
+            trend = "Water Receding (Distance Increasing)"
+        else:
+            trend = "Stable"
+    else:
+        slope = 0
+        trend = "Stable"
+        
+    return jsonify({
+        "median": median_dist,
+        "trend": trend,
+        "slope": slope
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

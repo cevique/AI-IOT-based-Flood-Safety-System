@@ -4,6 +4,8 @@ import Sidebar from "./components/Sidebar";
 import DashboardCards from "./components/DashboardCards";
 import StatusCounts from "./components/StatusCounts";
 import DistanceChart from "./components/DistanceChart";
+import Logs from "./components/Logs";
+import AIAnalytics from "./components/AIAnalytics";
 
 function App() {
   const [distance, setDistance] = useState(30);
@@ -12,6 +14,7 @@ function App() {
   const [override, setOverride] = useState(false);
   const [history, setHistory] = useState(Array(10).fill(50));
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activePage, setActivePage] = useState("Home");
 
   useEffect(() => {
   let isMounted = true; // to avoid state updates after unmount
@@ -76,6 +79,8 @@ function App() {
         setOverride={setOverride}
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
+        activePage={activePage}
+        setActivePage={setActivePage}
       />
 
       {/* Mobile Hamburger */}
@@ -90,9 +95,15 @@ function App() {
 
       {/* Main Content */}
       <div className="flex-1 p-4 max-w-full md:max-w-4xl mx-auto">
-        <DashboardCards distance={distance} floodCase={floodCase} />
-        <StatusCounts counts={counts} />
-        <DistanceChart history={history} />
+        {activePage === "Home" && (
+          <>
+            <DashboardCards distance={distance} floodCase={floodCase} />
+            <StatusCounts counts={counts} />
+            <DistanceChart history={history} />
+          </>
+        )}
+        {activePage === "Charts" && <AIAnalytics />}
+        {activePage === "Alerts" && <Logs />}
       </div>
     </div>
   );
