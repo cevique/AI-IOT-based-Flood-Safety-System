@@ -50,10 +50,10 @@ export default function Sidebar({
 
       {/* Sidebar */}
       <div
-        className={`fixed top-0 left-0 h-screen w-56 bg-black text-white p-4 flex flex-col items-center gap-6
+        className={`fixed top-0 left-0 min-h-screen h-full w-56 bg-black text-white p-4 flex flex-col items-center gap-6
                     z-50 transform transition-transform duration-500 ease-in-out
                     ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} 
-                    md:translate-x-0 md:relative md:h-screen`}
+                    md:translate-x-0 md:relative`}
       >
         <img
           src={logo}

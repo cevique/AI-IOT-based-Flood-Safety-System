@@ -1,14 +1,14 @@
+import os
 import json
 import time
 import sqlite3
 import threading
-from flask import Flask, jsonify, request
-from flask_cors import CORS
 import paho.mqtt.client as mqtt
 import numpy as np
+from flask import Flask, jsonify, request
+from flask_cors import CORS
 from sklearn.linear_model import LinearRegression
-
-import os
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -151,45 +151,57 @@ def toggle_override():
 @app.route('/api/logs', methods=['GET'])
 def get_logs():
     filter_date = request.args.get('filter', 'all')
-    status = request.args.get('status', 'all')
-    
+    filter_status = request.args.get('status', 'all')
+
+    # Use UTC+5 (or any fixed timezone) for consistent date filtering
+    tz_offset = timedelta(hours=5)
+    now_utc5 = datetime.now(timezone.utc) + tz_offset
+    today_start = datetime(now_utc5.year, now_utc5.month, now_utc5.day, tzinfo=timezone.utc).timestamp()
+
     conn = sqlite3.connect(DB_FILE, timeout=10)
     c = conn.cursor()
-    
+
     query = "SELECT timestamp, distance, status FROM readings WHERE 1=1"
     params = []
-    
+
+    # -----------------------------
     # Date Filter
-    now = int(time.time())
-    if filter_date == 'today':
-        start_of_day = now - (now % 86400)
-        query += " AND timestamp >= ?"
-        params.append(start_of_day)
-    elif filter_date == 'yesterday':
-        start_of_day = now - (now % 86400)
-        start_of_yesterday = start_of_day - 86400
-        query += " AND timestamp >= ? AND timestamp < ?"
-        params.extend([start_of_yesterday, start_of_day])
-    elif filter_date == 'week':
-        start_of_week = now - (7 * 86400)
-        query += " AND timestamp >= ?"
-        params.append(start_of_week)
-    elif filter_date == 'month':
-        start_of_month = now - (30 * 86400)
-        query += " AND timestamp >= ?"
-        params.append(start_of_month)
-        
+    # -----------------------------
+    if filter_date != "all":
+        if filter_date == "today":
+            start = int(today_start)
+            query += " AND timestamp >= ?"
+            params.append(start)
+        elif filter_date == "yesterday":
+            start = int(today_start - 86400)
+            end = int(today_start)
+            query += " AND timestamp >= ? AND timestamp < ?"
+            params.extend([start, end])
+        elif filter_date == "week":
+            start = int(today_start - 7 * 86400)
+            query += " AND timestamp >= ?"
+            params.append(start)
+        elif filter_date == "month":
+            start = int(today_start - 30 * 86400)
+            query += " AND timestamp >= ?"
+            params.append(start)
+
+    # -----------------------------
     # Status Filter
-    if status != 'all':
+    # -----------------------------
+    if filter_status != "all":
         query += " AND status = ?"
-        params.append(status)
-        
-    query += " ORDER BY id DESC LIMIT 100"
-    
+        params.append(filter_status)
+
+    # -----------------------------
+    # Ordering and limit
+    # -----------------------------
+    query += " ORDER BY timestamp DESC LIMIT 100"
+
     c.execute(query, params)
     rows = c.fetchall()
     conn.close()
-    
+
     logs = [{"timestamp": r[0], "distance": r[1], "status": r[2]} for r in rows]
     return jsonify(logs)
 

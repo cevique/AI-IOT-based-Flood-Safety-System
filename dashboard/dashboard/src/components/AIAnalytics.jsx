@@ -6,29 +6,39 @@ export default function AIAnalytics() {
     trend: "Loading...",
     slope: 0,
   });
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
 
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/analytics`);
-        if (!res.ok) throw new Error("Failed to fetch analytics");
-        const data = await res.json();
-        setAnalytics(data);
-        setLastUpdate(new Date());
-        setError(null);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching analytics:", error);
-        setError(error.message);
-        setLoading(false);
-      }
-    };
+  const fetchAnalytics = async (isInitial = false) => {
+    try {
+      if (isInitial) setLoading(true);
 
-    fetchAnalytics();
-    const interval = setInterval(fetchAnalytics, 2000);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/analytics`);
+      if (!res.ok) throw new Error("Failed to fetch analytics");
+
+      const data = await res.json();
+      setAnalytics(data);
+      setLastUpdate(new Date());
+      setError(null);
+      if (isInitial) setLoading(false);
+
+    } catch (error) {
+      console.error("Error fetching analytics:", error);
+      setError(error.message);
+      if (isInitial) setLoading(false);
+    }
+  };
+
+  // Initial fetch + interval
+  useEffect(() => {
+    fetchAnalytics(true);   // show loader on first load
+
+    const interval = setInterval(() => {
+      fetchAnalytics(false);   // silent updates
+    }, 2000);
+
     return () => clearInterval(interval);
   }, []);
 
@@ -41,16 +51,19 @@ export default function AIAnalytics() {
     <div className="p-4">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">AI Analytics</h2>
+
         <div className="flex items-center gap-2">
-          {loading && (
-            <span className="text-sm text-gray-500">Loading...</span>
-          )}
+          {loading && <span className="text-sm text-gray-500">Loading...</span>}
           {!loading && lastUpdate && (
             <span className="text-xs text-gray-400">
               Last update: {lastUpdate.toLocaleTimeString()}
             </span>
           )}
-          <div className={`w-2 h-2 rounded-full ${error ? 'bg-red-500' : 'bg-green-500 animate-pulse'}`}></div>
+          <div
+            className={`w-2 h-2 rounded-full ${
+              error ? "bg-red-500" : "bg-green-500 animate-pulse"
+            }`}
+          ></div>
         </div>
       </div>
 
@@ -67,7 +80,7 @@ export default function AIAnalytics() {
           </p>
         </div>
       )}
-      
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Median Distance */}
         <div className={`${cardBase} border-t-4 border-blue-500`}>
@@ -100,8 +113,8 @@ export default function AIAnalytics() {
       <div className="mt-8 bg-gray-50 p-6 rounded-lg border border-gray-200">
         <h3 className="font-bold text-lg text-gray-700 mb-2">How it works</h3>
         <p className="text-gray-600">
-          The system uses a <strong>Linear Regression Model</strong> (from Scikit-Learn) to analyze the last 20 sensor readings. 
-          It calculates the slope of the trend line to determine if the water level is rising (distance decreasing), 
+          The system uses a <strong>Linear Regression Model</strong> (from Scikit-Learn) to analyze the last 20 sensor readings.
+          It calculates the slope of the trend line to determine if the water level is rising (distance decreasing),
           receding (distance increasing), or stable. The Median filter is applied to the last 100 readings to provide a noise-free estimate of the current water level.
         </p>
       </div>

@@ -59,6 +59,7 @@ function App() {
 
   // Initial fetch
   fetchData();
+fetch(import.meta.env.VITE_API_URL + "/api/logs")
 
   // Poll every 1.5s
   const interval = setInterval(fetchData, 1500);
