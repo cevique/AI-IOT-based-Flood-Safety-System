@@ -5,10 +5,10 @@
 #include <LiquidCrystal_I2C.h>
 
 // ===== WiFi + Mosquitto =====
-const char* ssid = "PTCL-BB";       //  enter WIFI SSID
-const char* password = "76BD68EE";  //  enter WIFI Password
+const char* ssid = "zesty";       //  enter WIFI SSID
+const char* password = "surestraight3301";  //  enter WIFI Password
 
-const char* mqtt_server = "192.168.10.7";  // your Mosquitto server IP
+const char* mqtt_server = "10.136.248.240";  // your Mosquitto server IP
 const int mqtt_port = 1883;
 
 WiFiClient espClient;

@@ -63,7 +63,7 @@ export default function Sidebar({
           }`}
         />
 
-        <h1 className="text-xl font-bold">Flood Dashboard</h1>
+        <h1 className="text-xl font-bold">Water Dashboard</h1>
 
         {/* Manual Override */}
         <div

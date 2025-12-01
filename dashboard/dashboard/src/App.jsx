@@ -1,139 +1,14 @@
-import { useState, useEffect, useRef } from "react";
+import { Routes, Route } from "react-router-dom";
 import "./App.css";
-import Sidebar from "./components/Sidebar";
-import DashboardCards from "./components/DashboardCards";
-import StatusCounts from "./components/StatusCounts";
-import DistanceChart from "./components/DistanceChart";
-import Logs from "./components/Logs";
-import AIAnalytics from "./components/AIAnalytics";
-import Contact from "./components/Contact";
-import { toast } from "react-toastify";
+import DashboardLayout from "./components/DashboardLayout";
+import Home from "./components/Home";
 
 function App() {
-  const [distance, setDistance] = useState(30);
-  const [floodCase, setFloodCase] = useState("Safe");
-  const [counts, setCounts] = useState({ normal: 0, warning: 0, severe: 0 });
-  const [override, setOverride] = useState(false);
-  const [history, setHistory] = useState(Array(10).fill(50));
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activePage, setActivePage] = useState("Home");
-  const [alertActive, setAlertActive] = useState(false);
-  const toastId = useRef(null);
-
-  useEffect(() => {
-  let isMounted = true; // to avoid state updates after unmount
-  const controller = new AbortController();
-
-  const fetchData = async () => {
-    try {
-      // Fetch Status
-      const statusRes = await fetch(`${import.meta.env.VITE_API_URL}/api/status`, { signal: controller.signal });
-      if (!statusRes.ok) throw new Error("Status fetch failed");
-      const statusData = await statusRes.json();
-
-      if (isMounted && statusData) {
-        if (typeof statusData.distance !== "undefined") setDistance(statusData.distance);
-        if (typeof statusData.status !== "undefined") setFloodCase(statusData.status);
-        if (statusData.counts) {
-          setCounts({
-            normal: statusData.counts.normal || 0,
-            warning: statusData.counts.warning || 0,
-            severe: statusData.counts.severe || 0,
-          });
-        }
-        
-        // Alert Logic
-        if (statusData.alert_active) {
-          if (!toast.isActive(toastId.current)) {
-            toastId.current = toast.error("DANGER: Flood Warning Persisting! Evacuation may be required.", {
-              position: "top-center",
-              autoClose: false,
-              hideProgressBar: false,
-              closeOnClick: false,
-              pauseOnHover: true,
-              draggable: true,
-              progress: undefined,
-              theme: "colored",
-              style: { fontSize: "1.2em", fontWeight: "bold" }
-            });
-          }
-        } else {
-          if (toastId.current) {
-            toast.dismiss(toastId.current);
-            toastId.current = null;
-          }
-        }
-      }
-
-      // Fetch History
-      const historyRes = await fetch(`${import.meta.env.VITE_API_URL}/api/history`, { signal: controller.signal });
-      if (historyRes.ok) {
-        const historyData = await historyRes.json();
-        if (isMounted && Array.isArray(historyData)) {
-          setHistory(historyData);
-        }
-      }
-
-    } catch (error) {
-      if (error.name === "AbortError") {
-        // normal on unmount or abort
-      } else {
-        console.error("Error fetching data:", error);
-      }
-    }
-  };
-
-  // Initial fetch
-  fetchData();
-fetch(import.meta.env.VITE_API_URL + "/api/logs")
-
-  // Poll every 1.5s
-  const interval = setInterval(fetchData, 1500);
-
-  return () => {
-    isMounted = false;
-    controller.abort(); // cancel outstanding fetch
-    clearInterval(interval);
-  };
-}, []);
-
-
   return (
-    <div className="flex min-h-screen bg-white">
-      {/* Sidebar */}
-      <Sidebar
-        override={override}
-        setOverride={setOverride}
-        sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
-        activePage={activePage}
-        setActivePage={setActivePage}
-      />
-
-      {/* Mobile Hamburger */}
-      <div className="md:hidden fixed top-4 left-4 z-50">
-        <button
-          className="text-white bg-purple-700 p-2 rounded shadow-lg"
-          onClick={() => setSidebarOpen(prev => !prev)}
-        >
-          ☰
-        </button>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 p-4 max-w-full md:max-w-4xl mx-auto">
-        {activePage === "Home" && (
-          <>
-            <DashboardCards distance={distance} floodCase={floodCase} />
-            <StatusCounts counts={counts} />
-            <DistanceChart history={history} />
-          </>
-        )}
-        {activePage === "Charts" && <AIAnalytics />}
-        {activePage === "Alerts" && <Logs />}
-        {activePage === "Contact" && <Contact />}
-      </div>
-    </div>
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/dashboard" element={<DashboardLayout />} />
+    </Routes>
   );
 }
 
